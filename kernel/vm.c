@@ -119,6 +119,8 @@ walkaddr(pagetable_t pagetable, uint64 va)
   if(pte == 0)
     return 0;
   if((*pte & PTE_V) == 0)
+      // page fault
+      // treba da proverimo da li je stranica na disku i gde, da je dovucemo u odabranu stranicu za zamenu
     return 0;
   if((*pte & PTE_U) == 0)
     return 0;

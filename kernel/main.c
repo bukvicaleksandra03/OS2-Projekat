@@ -29,18 +29,19 @@ main()
     fileinit();      // file table
     virtio_disk_init(VIRTIO0_ID, "program_disk"); // emulated hard disk 0, with programs
     virtio_disk_init(VIRTIO1_ID, "swap_disk"); // emulated hard disk 1, with swap
-    uchar data[15];
-    for (int i = 0; i < 15; i++) {
-        data[i] = 'a';
-    }
-
-    write_block(16383, data, 1);
-
-    read_block(16383, data, 1);
-    for (int i = 0; i < 15; i++) {
-        printf("%d", data[i]);
-    }
-    printf("\n");
+//    uchar data[15];
+//    for (int i = 0; i < 15; i++) {
+//        data[i] = 'a';
+//    }
+//
+//    write_block(16383, data, 1);
+//
+//    read_block(16383, data, 1);
+//    for (int i = 0; i < 15; i++) {
+//        printf("%d", data[i]);
+//    }
+//    printf("\n");
+    swaping_init();
 
     userinit();      // first user process
     __sync_synchronize();

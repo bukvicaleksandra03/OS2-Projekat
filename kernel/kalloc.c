@@ -74,6 +74,9 @@ kalloc(void)
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;
+  else {
+      // ovde treba da pokrenemo trazenje victima i njegovo izbacivanje
+  }
   release(&kmem.lock);
 
   if(r)
