@@ -192,6 +192,7 @@ void            read_block(int blockno, uchar* data, int busy_wait);
 
 // swap.c
 void            swaping_init(void);
+uint16          free_slot_on_swap(void);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
