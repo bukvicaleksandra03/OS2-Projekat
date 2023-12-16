@@ -9,46 +9,69 @@
 #include "defs.h"
 
 #define SWAP_FRAMES 16384       // number of swap disk frames of 1kB
-#define SWAP_SLOTS SWAP_FRAMES/4
+#define SWAP_SLOTS 16384/4      // 4kB
+#define FRAMES_NUMBER ((uint64)PHYSTOP>>12) - ((uint64)KERNBASE>>12)
 
-struct swap_frame swap_frames[SWAP_SLOTS];
+uint64 swap_dsk_bit_vector [SWAP_SLOTS/64];  // SWAP_SLOTS/64 = 64
+//uint64 frames_number = ((uint64)PHYSTOP>>12) - ((uint64)KERNBASE>>12);
+struct frame_entry frame_entries[FRAMES_NUMBER];
 
-
-uint16
+int
 free_slot_on_swap(void) {
-    for (uint16 i = 0; i < SWAP_SLOTS; i++) {
-        if(swap_frames[i].is_free == 1) return i;
+    for (uint64 i; i < SWAP_SLOTS/64; i++) {
+        if (swap_dsk_bit_vector[i] != ~((uint64)0x0)) {  // ako nisu svi u ovoj reci zauzeti onda se krece u pretragu
+            uint64 tmp = swap_dsk_bit_vector[i];
+            uint8 index = 0;
+            while ((tmp & 1) != 0) {
+                tmp >>= 1;
+                index++;
+            }
+            return i * (SWAP_SLOTS/64) + index;
+        }
     }
-    return SWAP_SLOTS; // ako nema dovoljno slotova
+    return -1; // ako nema dovoljno slotova
+}
+
+void
+new_frame_entry(pte_t *pte, uint64 pa) {
+    if (((pa >> 12) - ((uint64)KERNBASE>>12)) < FRAMES_NUMBER && ((pa >> 12) - ((uint64)KERNBASE>>12)) > 0) {
+        frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].pte = pte;
+        frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].ref_bits = (uint8)0;
+    }
+    else {
+        printf("you dumb\n");
+    }
 }
 
 void
 swaping_init(void) {
     printf("began swaping init\n");
     // pravljenje neke strukture u kojoj cemo da cuvamo koji blokovi na disku su zauzeti
-        // struktura neka bude niz od 16384(to je broj blokova na disku) uint8
-        // ako je blok na disku zauzet taj element u nizu je 1, ako nije onda je taj element 0
+        // struktura neka bude koji ima 64 elemenata i u svakoj reci se u svakom bit cuva podatak za jedan
+        // slot na disku
 
-    for (uint32 i = 0; i < SWAP_SLOTS; i++) {
-        swap_frames[i].is_free = 1;
+    for (uint32 i = 0; i < SWAP_SLOTS/64; i++) {
+        swap_dsk_bit_vector[i] = 0;
     }
 
     // pravimo niz struktura frame_entry, niz ima onoliko elemenata koliko ima blokova u OM
-    uint32 frames_number = (uint32)(((uint64)PHYSTOP>>12) - ((uint64)KERNBASE>>12));
-    struct frame_entry frame_entries[frames_number];
-    for (uint32 i = 0; i < frames_number; i++) {
+
+    for (uint32 i = 0; i < FRAMES_NUMBER; i++) {
         frame_entries[i].pte = 0;
-        frame_entries[i].ref_bits = 0;
+        frame_entries[i].ref_bits = (uint8)0;
     }
 
-    for (uint32 i = 0; i < SWAP_SLOTS; i++) {
-        printf("%d", swap_frames[i].is_free);
-    }
+//    for (uint32 i = 0; i < SWAP_SLOTS/64; i++) {
+//        printf("%d", swap_dsk_bit_vector[i]);
+//    }
 
-    for (uint32 i = 0; i < frames_number; i++) {
-        printf("%d", frame_entries[i].pte);
-        printf("%d", frame_entries[i].ref_bits);
-    }
+//    printf("\n");
+//
+//    for (uint32 i = 0; i < FRAMES_NUMBER; i++) {
+//        printf("%d", frame_entries[i].pte);
+//        printf("%d", frame_entries[i].ref_bits);
+//        printf("\n");
+//    }
 
     // treba da napravimo strukturu koja ce sadrzati pointere na pocetak bloka u fizickoj adresi i na pte (page table entry)
     // pravimo novi element te strukture kad god se pozove void* kalloc(void), a da se ne radi o alokaciji stranica za kernel

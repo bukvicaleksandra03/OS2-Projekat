@@ -162,7 +162,7 @@ int             uartgetc(void);
 void            kvminit(void);
 void            kvminithart(void);
 void            kvmmap(pagetable_t, uint64, uint64, uint64, int);
-int             mappages(pagetable_t, uint64, uint64, uint64, int);
+int             mappages(pagetable_t, uint64, uint64, uint64, int, int);
 pagetable_t     uvmcreate(void);
 void            uvmfirst(pagetable_t, uchar *, uint);
 uint64          uvmalloc(pagetable_t, uint64, uint64, int);
@@ -192,7 +192,8 @@ void            read_block(int blockno, uchar* data, int busy_wait);
 
 // swap.c
 void            swaping_init(void);
-uint16          free_slot_on_swap(void);
+int             free_slot_on_swap(void);
+void            new_frame_entry(pte_t *, uint64);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

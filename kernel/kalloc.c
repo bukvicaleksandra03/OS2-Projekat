@@ -72,10 +72,11 @@ kalloc(void)
 
   acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
-    kmem.freelist = r->next;
-
+  if(r) {
+      kmem.freelist = r->next;
+  }
   else {
+      printf("FADF\n");
       // ovde treba da pokrenemo trazenje victima i njegovo izbacivanje
   }
   release(&kmem.lock);

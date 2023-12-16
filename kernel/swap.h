@@ -10,8 +10,4 @@ struct frame_entry {
     uint8 ref_bits;          // reference bits
 };
 
-struct swap_frame {
-    uint8 is_free;
-};
-
 #endif //OS2_PROJEKAT_SWAP_H

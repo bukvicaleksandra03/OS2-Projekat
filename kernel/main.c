@@ -41,7 +41,7 @@ main()
 //        printf("%d", data[i]);
 //    }
 //    printf("\n");
-    swaping_init();
+    //swaping_init();
 
     userinit();      // first user process
     __sync_synchronize();
