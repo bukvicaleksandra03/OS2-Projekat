@@ -76,7 +76,7 @@ kalloc(void)
       kmem.freelist = r->next;
   }
   else {
-      printf("FADF\n");
+      printf("swapping a page on the disk\n");
       // ovde treba da pokrenemo trazenje victima i njegovo izbacivanje
   }
   release(&kmem.lock);

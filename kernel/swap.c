@@ -13,7 +13,6 @@
 #define FRAMES_NUMBER ((uint64)PHYSTOP>>12) - ((uint64)KERNBASE>>12)
 
 uint64 swap_dsk_bit_vector [SWAP_SLOTS/64];  // SWAP_SLOTS/64 = 64
-//uint64 frames_number = ((uint64)PHYSTOP>>12) - ((uint64)KERNBASE>>12);
 struct frame_entry frame_entries[FRAMES_NUMBER];
 
 int
@@ -39,8 +38,34 @@ new_frame_entry(pte_t *pte, uint64 pa) {
         frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].ref_bits = (uint8)0;
     }
     else {
-        printf("you dumb\n");
+        panic("frame entry creation error\n");
     }
+}
+
+// ovu funkciju treba da periodicno zovemo
+void
+update_ref_bits() {
+    for (uint32 i = 0; i < FRAMES_NUMBER; i++) {
+        if (frame_entries[i].pte != 0) {
+            frame_entries[i].ref_bits >>= 1;
+            frame_entries[i].ref_bits = frame_entries[i].ref_bits | ((*frame_entries[i].pte & PTE_A) << 2);
+            // reset accessed bit
+            *frame_entries[i].pte &= ~PTE_A;
+        }
+    }
+}
+
+uint32
+find_victim() {
+    uint8 min_ref_bits = 0xff;
+    uint32 min_frame_index = -1;
+    for (uint32 i = 0; i < FRAMES_NUMBER; i++) {
+        if (frame_entries[i].pte != 0 && frame_entries[i].ref_bits < min_ref_bits) {
+            min_ref_bits = frame_entries[i].ref_bits;
+            min_frame_index = i;
+        }
+    }
+    return min_frame_index;
 }
 
 void
@@ -61,6 +86,7 @@ swaping_init(void) {
         frame_entries[i].ref_bits = (uint8)0;
     }
 
+    //swap_ticks = 0;
 //    for (uint32 i = 0; i < SWAP_SLOTS/64; i++) {
 //        printf("%d", swap_dsk_bit_vector[i]);
 //    }

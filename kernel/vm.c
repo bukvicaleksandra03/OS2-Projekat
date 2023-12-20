@@ -118,10 +118,13 @@ walkaddr(pagetable_t pagetable, uint64 va)
   pte = walk(pagetable, va, 0);
   if(pte == 0)
     return 0;
-  if((*pte & PTE_V) == 0)
+  if((*pte & PTE_V) == 0) {
+      printf("page fault\n");
       // page fault
       // treba da proverimo da li je stranica na disku i gde, da je dovucemo u odabranu stranicu za zamenu
-    return 0;
+      return 0;
+  }
+
   if((*pte & PTE_U) == 0)
     return 0;
   pa = PTE2PA(*pte);
@@ -158,17 +161,11 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm, int
       return -1;
     if(*pte & PTE_V)
       panic("mappages: remap");
-    // ovde treba da oznacimo da li je ok ovu stranicu swap-outovati ili ne koristeci 8. i 9. bit
     if (first) swaping_init();
     else {
-        // is a user process, but not first; mark as ok to swap out
+        // is a user process, but not first; create a structure frame_entry
         if (perm & PTE_U) {
             new_frame_entry(pte, pa);
-            perm = perm | PTE_S;
-        }
-        // not a user process, mark as not ok to swap out
-        else {
-            perm = perm & ~PTE_S;
         }
     }
     *pte = PA2PTE(pa) | perm | PTE_V;
