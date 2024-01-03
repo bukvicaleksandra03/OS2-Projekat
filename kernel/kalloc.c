@@ -51,6 +51,8 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
+  delete_frame_entry((uint64)pa);
+
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
@@ -61,7 +63,7 @@ kfree(void *pa)
   kmem.freelist = r;
   release(&kmem.lock);
 }
-
+int cnt = 0;
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
 // Returns 0 if the memory cannot be allocated.
@@ -76,8 +78,12 @@ kalloc(void)
       kmem.freelist = r->next;
   }
   else {
+      printf("%d\n", cnt);
+      cnt++;
       printf("swapping a page on the disk\n");
-      // ovde treba da pokrenemo trazenje victima i njegovo izbacivanje
+      release(&kmem.lock);
+      void* pa = swap_out_victim();
+      return pa;                        // pa ce biti 0 ako nema mesta na disku
   }
   release(&kmem.lock);
 

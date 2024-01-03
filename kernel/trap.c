@@ -6,7 +6,7 @@
 #include "proc.h"
 #include "defs.h"
 
-#define TICKS_UPDATE 1000
+#define TICKS_UPDATE 200
 uint64 swap_ticks = 0;
 
 struct spinlock tickslock;
@@ -171,7 +171,7 @@ clockintr()
   swap_ticks++;
   if (swap_ticks == TICKS_UPDATE) {
       update_ref_bits();
-      printf("updated ref bits");
+      //printf("updated ref bits");
       swap_ticks = 0;
   }
   wakeup(&ticks);

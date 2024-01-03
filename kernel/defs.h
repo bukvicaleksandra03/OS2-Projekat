@@ -192,9 +192,15 @@ void            read_block(int blockno, uchar* data, int busy_wait);
 
 // swap.c
 int             free_slot_on_swap(void);
-void            new_frame_entry(pte_t *, uint64);
+void            mark_slot_as_taken(int);
+void            mark_slot_as_free(int);
+void            remove_from_swap(pte_t*);
+void            new_frame_entry(pte_t*);
+void            delete_frame_entry(uint64);
 void            update_ref_bits(void);
 uint32          find_victim(void);
+void*           swap_out_victim(void);
+int             load_from_swap(pte_t*);
 void            swaping_init(void);
 
 

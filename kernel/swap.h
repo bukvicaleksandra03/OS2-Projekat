@@ -6,7 +6,7 @@
 #define OS2_PROJEKAT_SWAP_H
 
 struct frame_entry {
-    pte_t* pte;             // page table entry
+    pte_t* pte;              // page table entry
     uint8 ref_bits;          // reference bits
 };
 

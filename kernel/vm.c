@@ -97,7 +97,9 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
       if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
         return 0;
       memset(pagetable, 0, PGSIZE);
+      //printf("pagetable: %x, index is: %d\n", (uint64)pagetable, ((uint64)pagetable >> 12) - ((uint64)KERNBASE>>12));
       *pte = PA2PTE(pagetable) | PTE_V;
+      //new_frame_entry(pte, 1);
     }
   }
   return &pagetable[PX(0, va)];
@@ -119,10 +121,11 @@ walkaddr(pagetable_t pagetable, uint64 va)
   if(pte == 0)
     return 0;
   if((*pte & PTE_V) == 0) {
+      if (!(*pte & PTE_S)) return 0;
+
       printf("page fault\n");
-      // page fault
-      // treba da proverimo da li je stranica na disku i gde, da je dovucemo u odabranu stranicu za zamenu
-      return 0;
+      int ret = load_from_swap(pte);
+      if(ret != 0) return 0;  // no space on swap
   }
 
   if((*pte & PTE_U) == 0)
@@ -161,16 +164,24 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm, int
       return -1;
     if(*pte & PTE_V)
       panic("mappages: remap");
+
+    *pte = PA2PTE(pa) | perm | PTE_V;
     if (first) swaping_init();
     else {
         // is a user process, but not first; create a structure frame_entry
         if (perm & PTE_U) {
-            new_frame_entry(pte, pa);
+            new_frame_entry(pte);
+            *pte = *pte | PTE_S;
+        }
+        else {
+            *pte = *pte & (~PTE_S);
         }
     }
-    *pte = PA2PTE(pa) | perm | PTE_V;
-    if(a == last)
-      break;
+
+    if(a == last) {
+        break;
+
+    }
     a += PGSIZE;
     pa += PGSIZE;
   }
@@ -185,18 +196,23 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 {
   uint64 a;
   pte_t *pte;
+  int was_on_disk = 0;
 
   if((va % PGSIZE) != 0)
     panic("uvmunmap: not aligned");
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
+      was_on_disk = 0;
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+    if((*pte & PTE_V) == 0) {
+        was_on_disk = 1;
+        remove_from_swap(pte);
+    }
+      //panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
-    if(do_free){
+    if(do_free && !was_on_disk){
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
     }
@@ -326,8 +342,13 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
-    if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+    if((*pte & PTE_V) == 0) {
+      if (!(*pte & PTE_S)) panic("uvmcopy: page not present");
+
+      printf("page fault uvmcopy\n");
+      int ret = load_from_swap(pte);
+      if(ret != 0) return -1;  // no space on swap
+    }
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)
