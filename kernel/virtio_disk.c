@@ -250,6 +250,7 @@ virtio_disk_rw(int id, struct buf *b, int write, int busy_wait)
       break;
     }
     if (!busy_wait) {
+        intr_on();
         sleep(&disk[id].free[0], &disk[id].vdisk_lock);
     } else {
         release(&disk[id].vdisk_lock);

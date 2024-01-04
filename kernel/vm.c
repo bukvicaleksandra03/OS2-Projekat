@@ -97,9 +97,7 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
       if(!alloc || (pagetable = (pde_t*)kalloc()) == 0)
         return 0;
       memset(pagetable, 0, PGSIZE);
-      //printf("pagetable: %x, index is: %d\n", (uint64)pagetable, ((uint64)pagetable >> 12) - ((uint64)KERNBASE>>12));
       *pte = PA2PTE(pagetable) | PTE_V;
-      //new_frame_entry(pte, 1);
     }
   }
   return &pagetable[PX(0, va)];
@@ -123,7 +121,7 @@ walkaddr(pagetable_t pagetable, uint64 va)
   if((*pte & PTE_V) == 0) {
       if (!(*pte & PTE_S)) return 0;
 
-      printf("page fault\n");
+      printf("page fault walkaddr\n");
       int ret = load_from_swap(pte);
       if(ret != 0) return 0;  // no space on swap
   }
@@ -143,6 +141,8 @@ kvmmap(pagetable_t kpgtbl, uint64 va, uint64 pa, uint64 sz, int perm)
   if(mappages(kpgtbl, va, sz, pa, perm, 0) != 0)
     panic("kvmmap");
 }
+
+int initialised_swapping = 0;
 
 // Create PTEs for virtual addresses starting at va that refer to
 // physical addresses starting at pa. va and size might not
@@ -166,7 +166,12 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm, int
       panic("mappages: remap");
 
     *pte = PA2PTE(pa) | perm | PTE_V;
-    if (first) swaping_init();
+    if (first) {
+        if (!initialised_swapping) {
+            initialised_swapping = 1;
+            swaping_init();
+        }
+    }
     else {
         // is a user process, but not first; create a structure frame_entry
         if (perm & PTE_U) {
@@ -202,19 +207,23 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     panic("uvmunmap: not aligned");
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
-      was_on_disk = 0;
+    was_on_disk = 0;
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
     if((*pte & PTE_V) == 0) {
+      if (*pte & PTE_S) {
         was_on_disk = 1;
         remove_from_swap(pte);
+        printf("deleted from swap\n");
+      }
+      else panic("uvmunmap: not mapped");
     }
-      //panic("uvmunmap: not mapped");
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free && !was_on_disk){
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
+
     }
     *pte = 0;
   }
@@ -252,7 +261,7 @@ uvmfirst(pagetable_t pagetable, uchar *src, uint sz)
 // Allocate PTEs and physical memory to grow process from oldsz to
 // newsz, which need not be page aligned.  Returns new size or 0 on error.
 uint64
-uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
+uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm, int first)
 {
   char *mem;
   uint64 a;
@@ -264,11 +273,12 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
+        printf("no memory\n\n\n");
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
     memset(mem, 0, PGSIZE);
-    if(mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_R|PTE_U|xperm, 0) != 0){
+    if(mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_R|PTE_U|xperm, first) != 0){
       kfree(mem);
       uvmdealloc(pagetable, a, oldsz);
       return 0;
@@ -344,7 +354,6 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0) {
       if (!(*pte & PTE_S)) panic("uvmcopy: page not present");
-
       printf("page fault uvmcopy\n");
       int ret = load_from_swap(pte);
       if(ret != 0) return -1;  // no space on swap

@@ -71,9 +71,33 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    setkilled(p);
+    if (r_scause() == 0x000000000000000c || r_scause() == 0x000000000000000d || r_scause() == 0x000000000000000f) {
+      printf("trap page fault, pid: %d\n", p->pid);
+      printf("%s\n", p->name);
+      uint64 va = r_sepc();
+      pte_t* pte = walk(p->pagetable, va, 0);
+      if(!pte || !(*pte & PTE_S)) {
+        printf("1\nusertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+        printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+        setkilled(p);
+      }
+      else {
+          intr_on();
+          if (load_from_swap(pte) != 0) {
+              printf("2\nusertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+              printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+              setkilled(p);
+          }
+          else {
+              printf("obradjen page fault\n");
+          }
+      }
+    }
+    else {
+        printf("3\nusertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+        printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+        setkilled(p);
+    }
   }
 
   if(killed(p))
@@ -148,6 +172,10 @@ kerneltrap()
     panic("kerneltrap: interrupts enabled");
 
   if((which_dev = devintr()) == 0){
+      if (r_scause() == 0x000000000000000c || r_scause() == 0x000000000000000d || r_scause() == 0x000000000000000f) {
+          printf("trap page fault in kernel mode\n");
+
+      }
     printf("scause %p\n", scause);
     printf("sepc=%p stval=%p\n", r_sepc(), r_stval());
     panic("kerneltrap");

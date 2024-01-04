@@ -2009,14 +2009,16 @@ sbrkbasic(char *s)
   if(pid == 0){
     a = sbrk(TOOMUCH);
     if(a == (char*)0xffffffffffffffffL){
+        printf("dfoia\n");
       // it's OK if this fails.
       exit(0);
     }
 
     for(b = a; b < a+TOOMUCH; b += 4096){
+        printf("faidf\n");
       *b = 99;
     }
-
+    printf("parent\n\n");
     // we should not get here! either sbrk(TOOMUCH)
     // should have failed, or (with lazy allocation)
     // a pagefault should have killed this process.
@@ -2024,6 +2026,7 @@ sbrkbasic(char *s)
   }
 
   wait(&xstatus);
+
   if(xstatus == 1){
     printf("%s: too much memory allocated!\n", s);
     exit(1);
@@ -2602,7 +2605,7 @@ struct test {
   {exitwait, "exitwait"},
   {reparent, "reparent" },
   {twochildren, "twochildren"},
-  //{forkfork, "forkfork"},
+  {forkfork, "forkfork"},
   {forkforkfork, "forkforkfork"},
   {reparent2, "reparent2"},
   {sharedfd, "sharedfd"},

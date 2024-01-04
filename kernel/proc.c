@@ -6,6 +6,8 @@
 #include "proc.h"
 #include "defs.h"
 
+int using_disk;
+
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
@@ -264,7 +266,7 @@ growproc(int n)
 
   sz = p->sz;
   if(n > 0){
-    if((sz = uvmalloc(p->pagetable, sz, sz + n, PTE_W)) == 0) {
+    if((sz = uvmalloc(p->pagetable, sz, sz + n, PTE_W, 0)) == 0) {
       return -1;
     }
   } else if(n < 0){
@@ -289,11 +291,17 @@ fork(void)
   }
 
   // Copy user memory from parent to child.
+  using_disk = 1;
+  release(&np->lock);
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+    acquire(&np->lock);
     freeproc(np);
     release(&np->lock);
+    using_disk = 0;
     return -1;
   }
+  acquire(&np->lock);
+  using_disk = 0;
   np->sz = p->sz;
 
   // copy saved user registers.
@@ -408,12 +416,14 @@ wait(uint64 addr)
         if(pp->state == ZOMBIE){
           // Found one.
           pid = pp->pid;
+          release(&pp->lock);
+          release(&wait_lock);
           if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
                                   sizeof(pp->xstate)) < 0) {
-            release(&pp->lock);
-            release(&wait_lock);
             return -1;
           }
+          acquire(&pp->lock);
+          acquire(&wait_lock);
           freeproc(pp);
           release(&pp->lock);
           release(&wait_lock);
@@ -502,6 +512,8 @@ sched(void)
 void
 yield(void)
 {
+  if (using_disk) return;
+
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
