@@ -2009,13 +2009,11 @@ sbrkbasic(char *s)
   if(pid == 0){
     a = sbrk(TOOMUCH);
     if(a == (char*)0xffffffffffffffffL){
-        printf("dfoia\n");
       // it's OK if this fails.
       exit(0);
     }
 
     for(b = a; b < a+TOOMUCH; b += 4096){
-        printf("faidf\n");
       *b = 99;
     }
     printf("parent\n\n");
@@ -2074,15 +2072,18 @@ sbrkmuch(char *s)
   amt = BIG - (uint64)a;
   p = sbrk(amt);
 
+
   if (p != a) {
     printf("%s: sbrk test failed to grow big address space; enough phys mem?\n", s);
     exit(1);
   }
 
+
   // touch each page to make sure it exists.
   char *eee = sbrk(0);
-  for(char *pp = eee-4096; pp > a; pp -= 4096)
-    *pp = 1;
+  for(char *pp = eee-4096; pp > a; pp -= 4096) {
+      *pp = 1;
+  }
 
   lastaddr = (char*) (BIG-1);
   *lastaddr = 99;

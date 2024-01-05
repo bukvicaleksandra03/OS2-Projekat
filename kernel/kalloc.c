@@ -63,7 +63,7 @@ kfree(void *pa)
   kmem.freelist = r;
   release(&kmem.lock);
 }
-//int cnt = 0;
+
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
 // Returns 0 if the memory cannot be allocated.
@@ -78,9 +78,7 @@ kalloc(void)
       kmem.freelist = r->next;
   }
   else {
-      //printf("%d\n", cnt);
-      //cnt++;
-      printf("swapping a page on the disk\n");
+      //printf("swapping a page on the disk\n");
       release(&kmem.lock);
       void* pa = swap_out_victim();
       return pa;                        // pa ce biti 0 ako nema mesta na disku

@@ -13,15 +13,17 @@
 #define SWAP_SLOTS 16384/4      // 4kB
 #define FRAMES_NUMBER ((uint64)PHYSTOP>>12) - ((uint64)KERNBASE>>12)
 #define BUSY_WAIT 0
+#define SWAP_FRAME_SIZE 1<<10
 
 uint64 swap_dsk_bit_vector [SWAP_SLOTS/64];  // SWAP_SLOTS/64 = 64
 struct frame_entry frame_entries[FRAMES_NUMBER];
 
-//struct spinlock swap_lock;
+struct spinlock swap_lock;
 
 // pronalazi slobodan slot na disku, vraca vrednost od 0-4095
 int
 free_slot_on_swap(void) {
+    acquire(&swap_lock);
     for (int i = 0; i < SWAP_SLOTS/64; i++) {
         if (swap_dsk_bit_vector[i] != ~((uint64)0x0)) {  // ako nisu svi u ovoj reci zauzeti onda se krece u pretragu
             uint64 tmp = swap_dsk_bit_vector[i];
@@ -30,12 +32,11 @@ free_slot_on_swap(void) {
                 tmp >>= 1;
                 index++;
             }
-            printf("%d\n", i * 64 + index);
+            release(&swap_lock);
             return i * 64 + index;
         }
     }
-    printf("nema dovoljno slotova\n");
-
+    release(&swap_lock);
     return -1; // ako nema dovoljno slotova
 }
 
@@ -62,7 +63,7 @@ remove_from_swap(pte_t* pte) {
 
 void
 new_frame_entry(pte_t *pte) {
-    //acquire(&swap_lock);
+    acquire(&swap_lock);
     uint64 pa = PTE2PA(*pte);
 
     if (frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].pte != 0) printf("overwrite, %d\n", (pa >> 12) - ((uint64)KERNBASE>>12));
@@ -74,12 +75,12 @@ new_frame_entry(pte_t *pte) {
     else {
         panic("frame entry creation error\n");
     }
-    //release(&swap_lock);
+    release(&swap_lock);
 }
 
 void
 delete_frame_entry(uint64 pa) {
-    //acquire(&swap_lock);
+    acquire(&swap_lock);
     if (((pa >> 12) - ((uint64)KERNBASE>>12)) < FRAMES_NUMBER && ((pa >> 12) - ((uint64)KERNBASE>>12)) > 0) {
         frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].pte = 0;
         frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].ref_bits = (uint8)0;
@@ -87,12 +88,12 @@ delete_frame_entry(uint64 pa) {
     else {
         panic("frame entry deletion error\n");
     }
-    //release(&swap_lock);
+    release(&swap_lock);
 }
 
 void
 update_ref_bits() {
-    //acquire(&swap_lock);
+    acquire(&swap_lock);
     for (uint32 i = 0; i < FRAMES_NUMBER; i++) {
         if (frame_entries[i].pte != 0) {
             frame_entries[i].ref_bits >>= 1;
@@ -101,55 +102,57 @@ update_ref_bits() {
             *frame_entries[i].pte &= ~PTE_A;
         }
     }
-    //release(&swap_lock);
+    release(&swap_lock);
 }
 
+//int om_full = 0;
+//int cnt_swappable = 0;
 // uporedjuje sve ref_bite i pronalazi onog sa najmanjim ref bitima
 uint32
 find_victim() {
+    acquire(&swap_lock);
     uint8 min_ref_bits = 0xff;
     uint32 min_frame_index = -1;
     for (uint32 i = 0; i < FRAMES_NUMBER; i++) {
+//        if (frame_entries[i].pte != 0) {
+//            cnt_swappable++;
+//        }
         if (frame_entries[i].pte != 0 && frame_entries[i].ref_bits <= min_ref_bits) {
             min_ref_bits = frame_entries[i].ref_bits;
             min_frame_index = i;
         }
     }
+    release(&swap_lock);
     return min_frame_index;
 }
 
 void*
 swap_out_victim() {
-    //acquire(&swap_lock);
     uint32 victim = find_victim();
 
     void* pa = (void*)PTE2PA(*frame_entries[victim].pte);
 
     int slot = free_slot_on_swap();
     if (slot == -1) {
-        //release(&swap_lock);
         return 0;  // no space on swap disk
     }
+
     // sending a block from OM in 4 parts, because a block in OM is 4kB
     // and a block on the disk is 1kB
     mark_slot_as_taken(slot);
     *frame_entries[victim].pte &= ~(uint64)(0xfffffffffff << 10);
-    *frame_entries[victim].pte |= slot << 10;
+    *frame_entries[victim].pte |= (slot << 10);
     *frame_entries[victim].pte &= (~PTE_V);
     frame_entries[victim].pte = 0;
-    //release(&swap_lock);
 
-    printf("writing something\n");
+    //printf("writing something\n");
 
-    uchar* data0 = pa;
-    uchar* data1 = data0 + (1<<10);
-    uchar* data2 = data1 + (1<<10);
-    uchar* data3 = data2 + (1<<10);
+    uchar* data = pa;
 
-    write_block(slot * 4 + 0, data0, BUSY_WAIT);
-    write_block(slot * 4 + 1, data1, BUSY_WAIT);
-    write_block(slot * 4 + 2, data2, BUSY_WAIT);
-    write_block(slot * 4 + 3, data3, BUSY_WAIT);
+    for (int i = 0; i < 4; i++) {
+        write_block(slot * 4 + i, data, BUSY_WAIT);
+        data = data + (SWAP_FRAME_SIZE);
+    }
 
     sfence_vma();
     return pa;
@@ -157,7 +160,7 @@ swap_out_victim() {
 
 int
 load_from_swap(pte_t *pte) {
-    printf("load from swap\n");
+    //printf("load from swap\n");
     uint64 slot = (uint64)((*pte >> 10) & 0xfffffffffff);
 
     void* mem = kalloc();
@@ -166,15 +169,12 @@ load_from_swap(pte_t *pte) {
       return -1;
     }   // no space in OM, and no space on swap disk
 
-    uchar* data0 = mem;
-    uchar* data1 = data0 + (1<<10);
-    uchar* data2 = data1 + (1<<10);
-    uchar* data3 = data2 + (1<<10);
+    uchar* data = mem;
 
-    read_block(slot * 4 + 0, data0, BUSY_WAIT);
-    read_block(slot * 4 + 1, data1, BUSY_WAIT);
-    read_block(slot * 4 + 2, data2, BUSY_WAIT);
-    read_block(slot * 4 + 3, data3, BUSY_WAIT);
+    for (int i = 0; i < 4; i++) {
+        read_block(slot * 4 + i, data, BUSY_WAIT);
+        data = data + (SWAP_FRAME_SIZE);
+    }
 
     sfence_vma();
 
@@ -189,8 +189,6 @@ load_from_swap(pte_t *pte) {
 
 void
 swaping_init(void) {
-    printf("began swaping init\n");
-
     for (int i = 0; i < SWAP_SLOTS/64; i++) {
         swap_dsk_bit_vector[i] = 0;
     }
