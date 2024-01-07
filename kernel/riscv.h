@@ -345,6 +345,7 @@ typedef uint64 *pagetable_t; // 512 PTEs
 #define PTE_U (1L << 4) // user can access
 #define PTE_A (1L << 6) // accessed
 #define PTE_S (1L << 8) // swaped out
+#define PTE_T (1L << 9) // used for checking thrashing
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)

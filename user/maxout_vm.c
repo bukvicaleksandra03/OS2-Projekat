@@ -4,11 +4,10 @@
 
 int
 main(int argc, char *argv[]) {
-    // originaly was 6000
-    for (int i = 0; i < 5000; i++) {
+    for (int i = 0; i < 5500; i++) {
         uint64 a = (uint64) sbrk(4096);
         if (a == 0xffffffffffffffff) {
-            printf("doesn't work\n\n\n");
+            printf("doesn't work\n");
             break;
         }
 
@@ -16,6 +15,6 @@ main(int argc, char *argv[]) {
         *(char *) (a + 4096 - 1) = 1;
     }
 
-    printf("maxout_vm test finished\n\n\n");
+    printf("maxout_vm test finished\n");
     exit(0);
 }

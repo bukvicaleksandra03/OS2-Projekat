@@ -6,8 +6,10 @@
 #include "proc.h"
 #include "defs.h"
 
-#define TICKS_UPDATE 200
+#define TICKS_UPDATE 20
+#define CHECK_THRASHING 20
 uint64 swap_ticks = 0;
+uint64 thrashing_ticks = 0;
 
 struct spinlock tickslock;
 uint ticks;
@@ -71,33 +73,40 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    if (r_scause() == 0x000000000000000c || r_scause() == 0x000000000000000d || r_scause() == 0x000000000000000f) {
-//      printf("trap page fault, pid: %d\n", p->pid);
-//      printf("%s\n", p->name);
-//      printf("scause=%p\n", r_scause());
+    uint64 tmp = r_scause();
+    if (r_scause() == 0x0000000000000002) {
+        uint64 va = r_sepc();
+        pte_t* pte = walk(p->pagetable, va, 0);
+        printf("            ----->%p\n", PTE2PA(*pte));
+    }
+
+    if (r_scause() == 0x000000000000000c || r_scause() == 0x000000000000000d
+        || r_scause() == 0x000000000000000f) {
       uint64 va = r_stval();
       pte_t* pte = walk(p->pagetable, va, 0);
-//      uint64 slot = (uint64)((*pte >> 10) & 0xfffffffffff);
-//      if (slot > (KERNBASE>>12) && slot < (PHYSTOP>>12)) printf("paaaa\n\n\n");
       if(!pte || (*pte & PTE_V) || !(*pte & PTE_S) || !(*pte & PTE_U)) {
-        printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+        printf("1 usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
         printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+        printf("            pa=%p\n", PTE2PA(*pte));
         setkilled(p);
       }
       else {
           intr_on();
           if (load_from_swap(pte) != 0) {
-              printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+              // ovde moramo da suspendujemo proces, pa da ga kad se napravi mesto ponovo ucitamo
+
+              printf("2 usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
               printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
               setkilled(p);
           }
           else {
-              //printf("obradjen page fault\n");
+              printf("obradjen page fault, scause=%p\n", tmp);
+
           }
       }
     }
     else {
-        printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+        printf("3 usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
         printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
         setkilled(p);
     }
@@ -197,16 +206,27 @@ kerneltrap()
 void
 clockintr()
 {
-  acquire(&tickslock);
-  ticks++;
-  swap_ticks++;
-  if (swap_ticks == TICKS_UPDATE) {
+    acquire(&tickslock);
+    ticks++;
+    swap_ticks++;
+    thrashing_ticks++;
+
+    if (thrashing_ticks == CHECK_THRASHING) {
+      //check_thrashing();
+      thrashing_ticks = 0;
+    }
+
+    if (swap_ticks == TICKS_UPDATE) {
       update_ref_bits();
-      //printf("updated ref bits");
       swap_ticks = 0;
-  }
-  wakeup(&ticks);
-  release(&tickslock);
+    }
+
+    //struct proc* p = myproc();
+    //if (p) printf("pid:%d\n", p->pid);
+
+    wakeup(&ticks);
+    release(&tickslock);
+
 }
 
 // check if it's an external interrupt or software interrupt,

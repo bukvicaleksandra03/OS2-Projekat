@@ -1,7 +1,5 @@
 #include "types.h"
 
-//int using_disk;
-
 struct buf;
 struct context;
 struct file;
@@ -196,10 +194,12 @@ void            read_block(int blockno, uchar* data, int busy_wait);
 int             free_slot_on_swap(void);
 void            mark_slot_as_taken(int);
 void            mark_slot_as_free(int);
-void            remove_from_swap(pte_t*);
+void            remove_from_swap(pte_t);
 void            new_frame_entry(pte_t*);
 void            delete_frame_entry(uint64);
+int             count_working_set(pagetable_t);
 void            update_ref_bits(void);
+void            check_thrashing(void);
 uint32          find_victim(void);
 void*           swap_out_victim(void);
 int             load_from_swap(pte_t*);

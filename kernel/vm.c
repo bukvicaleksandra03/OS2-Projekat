@@ -122,7 +122,7 @@ walkaddr(pagetable_t pagetable, uint64 va)
   if((*pte & PTE_V) == 0) {
     if (!(*pte & PTE_S)) return 0;
 
-    //printf("page fault walkaddr\n");
+    printf("page fault walkaddr\n");
     int ret = load_from_swap(pte);
     if(ret != 0) return 0;  // no space on swap
   }
@@ -204,29 +204,30 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
   pte_t *pte;
   int was_on_disk = 0;
 
-  if((va % PGSIZE) != 0)
-    panic("uvmunmap: not aligned");
-
-  for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
-    was_on_disk = 0;
-    if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
-    if((*pte & PTE_V) == 0) {
-      if (*pte & PTE_S) {
-        was_on_disk = 1;
-        remove_from_swap(pte);
-      }
-      else panic("uvmunmap: not mapped");
-    }
-    if(PTE_FLAGS(*pte) == PTE_V)
-      panic("uvmunmap: not a leaf");
-    if(do_free && !was_on_disk){
-      uint64 pa = PTE2PA(*pte);
-      kfree((void*)pa);
-
-    }
-    *pte = 0;
+  if((va % PGSIZE) != 0) {
+      panic("uvmunmap: not aligned");
   }
+
+    for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
+        was_on_disk = 0;
+        if((pte = walk(pagetable, a, 0)) == 0)
+            panic("uvmunmap: walk");
+        if((*pte & PTE_V) == 0) {
+            if (*pte & PTE_S) {
+                was_on_disk = 1;
+                remove_from_swap(*pte);
+            }
+            else panic("uvmunmap: not mapped");
+        }
+        if(PTE_FLAGS(*pte) == PTE_V)
+            panic("uvmunmap: not a leaf");
+        if(do_free && !was_on_disk){
+            uint64 pa = PTE2PA(*pte);
+            kfree((void*)pa);
+
+        }
+        *pte = 0;
+    }
 }
 
 // create an empty user page table.
@@ -353,7 +354,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0) {
       if (!(*pte & PTE_S)) panic("uvmcopy: page not present");
-      //printf("page fault uvmcopy\n");
+      printf("page fault uvmcopy\n");
       int ret = load_from_swap(pte);
       if(ret != 0) return -1;  // no space on swap
     }

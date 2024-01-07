@@ -90,14 +90,16 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
       sleep(&pi->nwrite, &pi->lock);
     } else {
       char ch;
+      release(&pi->lock);
       if(copyin(pr->pagetable, &ch, addr + i, 1) == -1)
         break;
+      acquire(&pi->lock);
       pi->data[pi->nwrite++ % PIPESIZE] = ch;
       i++;
     }
   }
   wakeup(&pi->nread);
-  release(&pi->lock);
+  if (holding(&pi->lock)) release(&pi->lock);
 
   return i;
 }
@@ -121,10 +123,12 @@ piperead(struct pipe *pi, uint64 addr, int n)
     if(pi->nread == pi->nwrite)
       break;
     ch = pi->data[pi->nread++ % PIPESIZE];
+    release(&pi->lock);
     if(copyout(pr->pagetable, addr + i, &ch, 1) == -1)
       break;
+    acquire(&pi->lock);
   }
   wakeup(&pi->nwrite);  //DOC: piperead-wakeup
-  release(&pi->lock);
+  if (holding(&pi->lock)) release(&pi->lock);
   return i;
 }
