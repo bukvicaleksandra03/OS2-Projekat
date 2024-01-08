@@ -6,8 +6,8 @@
 #include "proc.h"
 #include "defs.h"
 
-#define TICKS_UPDATE 20
-#define CHECK_THRASHING 20
+#define TICKS_UPDATE 10
+#define CHECK_THRASHING 300
 uint64 swap_ticks = 0;
 uint64 thrashing_ticks = 0;
 
@@ -100,8 +100,9 @@ usertrap(void)
               setkilled(p);
           }
           else {
-              printf("obradjen page fault, scause=%p\n", tmp);
-
+              printf("obradjen page fault, scause=%p, pid=%d\n", tmp, p->pid);
+//              printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+              printf("            pa=%p\n", PTE2PA(*pte));
           }
       }
     }
@@ -116,8 +117,10 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
+  if(which_dev == 2) {
+      yield();
+  }
+
 
   usertrapret();
 }
@@ -212,13 +215,13 @@ clockintr()
     thrashing_ticks++;
 
     if (thrashing_ticks == CHECK_THRASHING) {
-      //check_thrashing();
-      thrashing_ticks = 0;
+        check_thrashing();
+        thrashing_ticks = 0;
     }
 
     if (swap_ticks == TICKS_UPDATE) {
-      update_ref_bits();
-      swap_ticks = 0;
+        update_ref_bits();
+        swap_ticks = 0;
     }
 
     //struct proc* p = myproc();

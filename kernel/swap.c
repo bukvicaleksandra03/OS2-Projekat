@@ -23,28 +23,53 @@ struct frame_entry frame_entries[FRAMES_NUMBER];
 
 struct spinlock swap_lock;
 
-uint cnt_page_faults;
-uint64 taken;
-int om_full = 0;
-
 extern struct proc proc[NPROC];
+
+void* tschan[NPROC];
+struct proc* thrash_sleep[NPROC];
+struct spinlock tslock[NPROC];
+int head = -1, tail = -1;
+
+void
+swap_proc_out() {
+    printf("swap_proc_out\n");
+    if(tail == -1) {
+        head = tail = 0;
+    } else {
+        tail = (tail + 1) % NPROC;
+    }
+    sleep(tschan[tail], &tslock[tail]);
+}
+
+void
+swap_proc_in() {
+    printf("swap_proc_in\n");
+    if (head != -1) {
+        wakeup(tschan[head]);
+        if (head == tail) head = tail = -1;
+        else head = (head + 1) % NPROC;
+        //printf("process with pid=%d returned after sleeping\n", myproc()->pid);
+    }
+}
 
 // pronalazi slobodan slot na disku, vraca vrednost od 0-4095
 int
 free_slot_on_swap(void) {
-    for (int i = 0; i < SWAP_SLOTS/64; i++) {
-        if (swap_dsk_bit_vector[i] != ~((uint64)0x0)) {  // ako nisu svi u ovoj reci zauzeti onda se krece u pretragu
+   for (int i = 0; i < SWAP_SLOTS/64; i++) {
+       if (swap_dsk_bit_vector[i] != ~((uint64)0x0)) {  // ako nisu svi u ovoj reci zauzeti onda se krece u pretragu
             uint64 tmp = swap_dsk_bit_vector[i];
-            int index = 0;
+            uint64 index = 0;
             while ((tmp & 1) != 0) {
                 tmp >>= 1;
                 index++;
             }
+            printf("%d\n", i*64 + index);
             return i * 64 + index;
-        }
-    }
-    printf("no free slots on swap disk\n");
-    return -1; // ako nema dovoljno slotova
+       }
+   }
+
+   printf("no free slots on swap disk\n");
+   return -1; // ako nema dovoljno slotova
 }
 
 void
@@ -72,11 +97,11 @@ void
 new_frame_entry(pte_t *pte) {
     uint64 pa = PTE2PA(*pte);
 
-    if (frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].pte != 0) printf("overwrite, %d\n", (pa >> 12) - ((uint64)KERNBASE>>12));
+    if (frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].pte != 0) printf("overwrite, %d\n\n\n", (pa >> 12) - ((uint64)KERNBASE>>12));
 
     if (((pa >> 12) - ((uint64)KERNBASE>>12)) < FRAMES_NUMBER && ((pa >> 12) - ((uint64)KERNBASE>>12)) > 0) {
         frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].pte = pte;
-        frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].ref_bits = (uint8)0x80;
+        frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].ref_bits = (uint8)0xf0;
     }
     else {
         panic("frame entry creation error\n");
@@ -111,8 +136,6 @@ update_ref_bits() {
     release(&swap_lock);
 }
 
-struct proc* thrash_sleep[NPROC];
-int head = -1, tail = -1;
 
 int
 count_working_set(pagetable_t pagetable) {
@@ -125,8 +148,10 @@ count_working_set(pagetable_t pagetable) {
             result += count_working_set((pagetable_t)child);
         } else if(pte & PTE_V){
             if (pte & PTE_A) result++;
+            if (frame_entries[(PTE2PA(pte) >> 12) - ((uint64)KERNBASE>>12)].ref_bits & 0x80) result++;
+            //if (frame_entries[(PTE2PA(pte) >> 12) - ((uint64)KERNBASE>>12)].ref_bits & 0x40) result++;
         } else if(!(pte & PTE_V) && (pte & PTE_S)) {
-            if (pte & PTE_T) result++;
+            if (pte & PTE_T) result += 4;
             pagetable[i] &= ~PTE_T;
         }
     }
@@ -135,7 +160,8 @@ count_working_set(pagetable_t pagetable) {
 
 void
 check_thrashing() {
-    int working_set = 0, max_working_set = 0;
+    int working_set = 0;
+    //max_working_set = 0;
     struct proc* p;
     //struct proc* to_swap_out;
     //to_swap_out = 0;
@@ -144,46 +170,32 @@ check_thrashing() {
         if (p->state == RUNNABLE || p->state == SLEEPING || p->state == RUNNING) {
             int ws = count_working_set(p->pagetable);
             working_set += ws;
-            if (p->state == RUNNABLE && ws > max_working_set) {
-                max_working_set = ws;
-                //to_swap_out = p;
-            }
+//            if (p->state != SLEEPING && ws > max_working_set) {
+//                max_working_set = ws;
+//                to_swap_out = p;
+//            }
         }
         release(&p->lock);
     }
 
-    if (working_set > 20) printf("-------------->working set=%d<--------------\n", working_set);
+    //if (working_set > 50) printf("---------------------------------------------------------->working set=%d<--------------\n", working_set);
 
-//    if (working_set < FRAMES_NUMBER / 4) {
-//        if (head != -1) {
-//            struct proc* p = thrash_sleep[head];
-//            p->state = RUNNABLE;
-//            printf("process with pid=%d returned to execution\n", p->pid);
-//            if (head == tail) head = tail = -1;
-//            else head = (head + 1) % NPROC;
-//        }
-//        return;
-//    }
-//
-//    if (!(working_set > FRAMES_NUMBER * 3 / 4)) return;
-//
-//    printf("\nTHRASHING!!!\n\n");
-//
-//    if (!to_swap_out) return;
-//    to_swap_out->state = SLEEPING;
-//    if(tail == -1) {
-//        head = tail = 0;
-//    } else {
-//        tail = (tail + 1) % NPROC;
-//    }
-//    thrash_sleep[tail] = to_swap_out;
-//    printf("process with pid=%d waiting for thrashing to stop\n", to_swap_out->pid);
+    if (working_set < FRAMES_NUMBER / 4) {
+        if (head != -1) swap_proc_in();
+    }
+
+    if (!(working_set > FRAMES_NUMBER * 3 / 4)) return;
+
+    printf("\nTHRASHING!!!\n\n");
+
+    printf("process with pid=%d waiting for thrashing to stop\n", p->pid);
+    //if (!to_swap_out) return;
+    swap_proc_out();
 }
 
 // uporedjuje sve ref_bite i pronalazi onog sa najmanjim ref bitima
 uint32
 find_victim() {
-    om_full = 1;
     uint8 min_ref_bits = 0xff;
     uint32 min_frame_index = -1;
     for (uint32 i = 0; i < FRAMES_NUMBER; i++) {
@@ -192,7 +204,7 @@ find_victim() {
             min_frame_index = i;
         }
     }
-
+    if (min_frame_index == 0xff) panic("find victim");
     return min_frame_index;
 }
 
@@ -201,7 +213,6 @@ int cnt = 0;
 void*
 swap_out_victim() {
     acquire(&swap_lock);
-    om_full = 1;
 
     uint32 victim = find_victim();
 
@@ -216,14 +227,11 @@ swap_out_victim() {
     // sending a block from OM in 4 parts, because a block in OM is 4kB
     // and a block on the disk is 1kB
     mark_slot_as_taken(slot);
-    *frame_entries[victim].pte &= ~(uint64)(0xfffffffffff << 10);
-    *frame_entries[victim].pte |= (slot << 10);
-    *frame_entries[victim].pte &= (~PTE_V);
-    if (*frame_entries[victim].pte & PTE_A) *frame_entries[victim].pte |= PTE_T;
-    frame_entries[victim].pte = 0;
+    pte_t * pte = frame_entries[victim].pte;
+
 
     cnt++;
-    printf("writing to disk - %d\n", cnt);
+    printf("writing to disk - %d, slot - %d\n", cnt, slot);
 
     release(&swap_lock);
     uchar* data = pa;
@@ -233,14 +241,18 @@ swap_out_victim() {
         data = data + (SWAP_FRAME_SIZE);
     }
 
+    *pte &= ~(uint64)(0xfffffffffff << 10);
+    *pte |= (slot << 10);
+    *pte &= (~PTE_V);
+    if (*pte & PTE_A) *frame_entries[victim].pte |= PTE_T;
+    frame_entries[victim].pte = 0;
+
     return pa;
 }
 
 int
 load_from_swap(pte_t *pte) {
-    //printf("load from swap\n");
-    cnt_page_faults++;
-
+    printf("load from swap\n");
     uint64 slot = (uint64)((*pte >> 10) & 0xfffffffffff);
 
     void* mem = kalloc();

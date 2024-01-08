@@ -30,17 +30,41 @@ main(int argc, char *argv[]) {
                 pages[k] = a;
                 if (a == 0xffffffffffffffff) {
                     printf("doesn't work\n");
-                    break;
+                    exit(0);
                 }
             }
 
 
-            for (int k = 0; k < 100000; k++) {
-                for (int s = 0; s < NUM_PAGES; s ++) {
+
+                for (int s = 0; s < NUM_PAGES; s += 20) {
                     // modify the memory to make sure it's really allocated.
-                    *(char *) (pages[s] + 4096 - 1) = 1;
+                    for (int l = 0; l < 1000; l++) {
+                        for (int m = 1; m < 4096; m++) {
+                            *(char *) (pages[s] + 4096 - m) = 1;
+                            *(char *) (pages[s+1] + 4096 - m) = 1;
+                            *(char *) (pages[s+2] + 4096 - m) = 1;
+                            *(char *) (pages[s+3] + 4096 - m) = 1;
+                            *(char *) (pages[s+4] + 4096 - m) = 1;
+                            *(char *) (pages[s+5] + 4096 - m) = 1;
+                            *(char *) (pages[s+6] + 4096 - m) = 1;
+                            *(char *) (pages[s+7] + 4096 - m) = 1;
+                            *(char *) (pages[s+8] + 4096 - m) = 1;
+                            *(char *) (pages[s+9] + 4096 - m) = 1;
+                            *(char *) (pages[s+10] + 4096 - m) = 1;
+                            *(char *) (pages[s+11] + 4096 - m) = 1;
+                            *(char *) (pages[s+12] + 4096 - m) = 1;
+                            *(char *) (pages[s+13] + 4096 - m) = 1;
+                            *(char *) (pages[s+14] + 4096 - m) = 1;
+                            *(char *) (pages[s+15] + 4096 - m) = 1;
+                            *(char *) (pages[s+16] + 4096 - m) = 1;
+                            *(char *) (pages[s+17] + 4096 - m) = 1;
+                            *(char *) (pages[s+18] + 4096 - m) = 1;
+                            *(char *) (pages[s+19] + 4096 - m) = 1;
+                        }
+                    }
                 }
-            }
+            //}
+
             exit(0);
         }
     }

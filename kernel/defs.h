@@ -191,6 +191,8 @@ void            write_block(int blockno, uchar* data, int busy_wait);
 void            read_block(int blockno, uchar* data, int busy_wait);
 
 // swap.c
+void            swap_proc_out();
+void            swap_proc_in();
 int             free_slot_on_swap(void);
 void            mark_slot_as_taken(int);
 void            mark_slot_as_free(int);

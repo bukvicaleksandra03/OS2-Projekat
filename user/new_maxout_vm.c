@@ -7,12 +7,12 @@ main(int argc, char *argv[]) {
     uint64 pages[200];
     int s, k;
 
-    for (int i = 0; i < 5500; i++) {
+    for (int i = 0; i < 6000; i++) {
         uint64 a = (uint64) sbrk(4096);
 
         if (a == 0xffffffffffffffff) {
             printf("no space\n");
-            break;
+            exit(0);
         }
 
         if (i < 200) pages[i] = a;
