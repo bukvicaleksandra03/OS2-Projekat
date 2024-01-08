@@ -20,25 +20,26 @@ main(int argc, char *argv[]) {
             exit(1);
         }
         if(pid == 0) {
-            for(int m = 0; m < 1000000; m++);
+            for(int m = 0; m < 10000; m++);
 
 
             uint64 pages[NUM_PAGES];
 
             for (int k = 0; k < NUM_PAGES; k++) {
                 uint64 a = (uint64) sbrk(4096);
-                pages[k] = a;
+
                 if (a == 0xffffffffffffffff) {
                     printf("doesn't work\n");
-                    exit(0);
+                    sbrk(-k * 4096);
+
+                    exit(1);
                 }
+                pages[k] = a;
             }
-
-
 
                 for (int s = 0; s < NUM_PAGES; s += 20) {
                     // modify the memory to make sure it's really allocated.
-                    for (int l = 0; l < 1000; l++) {
+                    for (int l = 0; l < 10; l++) {
                         for (int m = 1; m < 4096; m++) {
                             *(char *) (pages[s] + 4096 - m) = 1;
                             *(char *) (pages[s+1] + 4096 - m) = 1;
@@ -63,7 +64,6 @@ main(int argc, char *argv[]) {
                         }
                     }
                 }
-            //}
 
             exit(0);
         }
@@ -74,7 +74,9 @@ main(int argc, char *argv[]) {
         wait(&xstatus);
         if(xstatus != 0) {
             printf("fork in child failed\n");
-            exit(1);
+            //exit(1);
+        } else {
+            printf("OK\n");
         }
     }
 

@@ -63,7 +63,7 @@ free_slot_on_swap(void) {
                 tmp >>= 1;
                 index++;
             }
-            printf("%d\n", i*64 + index);
+            //printf("%d\n", i*64 + index);
             return i * 64 + index;
        }
    }
@@ -76,7 +76,7 @@ void
 mark_slot_as_taken(int slot) {
     int row = slot / 64;
     int col = slot % 64;
-    swap_dsk_bit_vector[row] |= (uint64)(1 << col);
+    swap_dsk_bit_vector[row] |= ((uint64)0x1 << col);
 }
 
 void
@@ -89,6 +89,7 @@ mark_slot_as_free(int slot) {
 void
 remove_from_swap(pte_t pte) {
     long int slot = (long int)((pte >> 10) & 0xfffffffffff);
+    //printf("remove_from_swap, slot: %d\n", slot);
     if (slot >= 0 && slot < SWAP_SLOTS) mark_slot_as_free(slot);
     else { panic("remove from swap"); }
 }
@@ -102,6 +103,7 @@ new_frame_entry(pte_t *pte) {
     if (((pa >> 12) - ((uint64)KERNBASE>>12)) < FRAMES_NUMBER && ((pa >> 12) - ((uint64)KERNBASE>>12)) > 0) {
         frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].pte = pte;
         frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].ref_bits = (uint8)0xf0;
+        frame_entries[(pa >> 12) - ((uint64)KERNBASE>>12)].swapped = 0;
     }
     else {
         panic("frame entry creation error\n");
@@ -199,16 +201,15 @@ find_victim() {
     uint8 min_ref_bits = 0xff;
     uint32 min_frame_index = -1;
     for (uint32 i = 0; i < FRAMES_NUMBER; i++) {
-        if (frame_entries[i].pte != 0 && frame_entries[i].ref_bits <= min_ref_bits) {
+        if (frame_entries[i].pte != 0 && frame_entries[i].ref_bits <= min_ref_bits && !frame_entries[i].swapped) {
             min_ref_bits = frame_entries[i].ref_bits;
             min_frame_index = i;
         }
     }
     if (min_frame_index == 0xff) panic("find victim");
+    frame_entries[min_frame_index].swapped = 1;
     return min_frame_index;
 }
-
-int cnt = 0;
 
 void*
 swap_out_victim() {
@@ -229,9 +230,7 @@ swap_out_victim() {
     mark_slot_as_taken(slot);
     pte_t * pte = frame_entries[victim].pte;
 
-
-    cnt++;
-    printf("writing to disk - %d, slot - %d\n", cnt, slot);
+    printf("writing to disk, slot - %d\n", slot);
 
     release(&swap_lock);
     uchar* data = pa;
@@ -288,6 +287,7 @@ swaping_init(void) {
     for (uint32 i = 0; i < FRAMES_NUMBER; i++) {
         frame_entries[i].pte = 0;
         frame_entries[i].ref_bits = (uint8)0;
+        frame_entries[i].swapped = (uint8)0;
     }
 
     for (int i = 0; i < NPROC; i++) {

@@ -4,7 +4,7 @@
 
 int
 main(int argc, char *argv[]) {
-    for (int i = 0; i < 5500; i++) {
+    for (int i = 0; i < 6000; i++) {
         uint64 a = (uint64) sbrk(4096);
         if (a == 0xffffffffffffffff) {
             printf("doesn't work\n");

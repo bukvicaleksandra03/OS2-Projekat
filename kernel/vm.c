@@ -122,7 +122,7 @@ walkaddr(pagetable_t pagetable, uint64 va)
   if((*pte & PTE_V) == 0) {
     if (!(*pte & PTE_S)) return 0;
 
-    printf("page fault walkaddr\n");
+    //printf("page fault walkaddr\n");
     int ret = load_from_swap(pte);
     if(ret != 0) return 0;  // no space on swap
   }
@@ -176,7 +176,7 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm, int
     }
     else {
       // is a user process, but not first; create a structure frame_entry
-      if (perm & PTE_U) {
+      if ((perm & PTE_U) && !(PTE_X & perm)) {
         new_frame_entry(pte);
         *pte = *pte | PTE_S;
       }
@@ -213,7 +213,7 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
         if((pte = walk(pagetable, a, 0)) == 0)
             panic("uvmunmap: walk");
         if((*pte & PTE_V) == 0) {
-            if (*pte & PTE_S) {
+            if ((*pte & PTE_S) && do_free) {
                 was_on_disk = 1;
                 remove_from_swap(*pte);
             }
@@ -354,7 +354,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0) {
       if (!(*pte & PTE_S)) panic("uvmcopy: page not present");
-      printf("page fault uvmcopy\n");
+      //printf("page fault uvmcopy\n");
       int ret = load_from_swap(pte);
       if(ret != 0) return -1;  // no space on swap
     }

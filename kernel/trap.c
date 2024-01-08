@@ -73,7 +73,7 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    uint64 tmp = r_scause();
+    //uint64 tmp = r_scause();
     if (r_scause() == 0x0000000000000002) {
         uint64 va = r_sepc();
         pte_t* pte = walk(p->pagetable, va, 0);
@@ -87,7 +87,7 @@ usertrap(void)
       if(!pte || (*pte & PTE_V) || !(*pte & PTE_S) || !(*pte & PTE_U)) {
         printf("1 usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
         printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-        printf("            pa=%p\n", PTE2PA(*pte));
+        //printf("            pa=%p\n", PTE2PA(*pte));
         setkilled(p);
       }
       else {
@@ -100,9 +100,9 @@ usertrap(void)
               setkilled(p);
           }
           else {
-              printf("obradjen page fault, scause=%p, pid=%d\n", tmp, p->pid);
+              //printf("obradjen page fault, scause=%p, pid=%d\n", tmp, p->pid);
 //              printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-              printf("            pa=%p\n", PTE2PA(*pte));
+              //printf("            pa=%p\n", PTE2PA(*pte));
           }
       }
     }
