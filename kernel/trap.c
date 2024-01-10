@@ -7,7 +7,7 @@
 #include "defs.h"
 
 #define TICKS_UPDATE 10
-#define CHECK_THRASHING 300
+#define CHECK_THRASHING 30
 uint64 swap_ticks = 0;
 uint64 thrashing_ticks = 0;
 
@@ -100,9 +100,9 @@ usertrap(void)
               setkilled(p);
           }
           else {
-              //printf("obradjen page fault, scause=%p, pid=%d\n", tmp, p->pid);
+//              printf("obradjen page fault, scause=%p, pid=%d\n", tmp, p->pid);
 //              printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-              //printf("            pa=%p\n", PTE2PA(*pte));
+//              printf("            pa=%p\n", PTE2PA(*pte));
           }
       }
     }

@@ -176,7 +176,8 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm, int
     }
     else {
       // is a user process, but not first; create a structure frame_entry
-      if ((perm & PTE_U) && !(PTE_X & perm)) {
+      // if ((perm & PTE_U) && !(PTE_X & perm)) {
+      if (perm & PTE_U) {
         new_frame_entry(pte);
         *pte = *pte | PTE_S;
       }

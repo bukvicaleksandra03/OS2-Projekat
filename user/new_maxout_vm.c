@@ -11,7 +11,7 @@ main(int argc, char *argv[]) {
         uint64 a = (uint64) sbrk(4096);
 
         if (a == 0xffffffffffffffff) {
-            printf("no space\n");
+            printf("NO SPACE\n\n\n");
             exit(0);
         }
 
@@ -35,13 +35,17 @@ main(int argc, char *argv[]) {
 
     for (s = 0; s < 200; s += 5) {
         // modify the memory to make sure it's really allocated.
-        if (*(char *) (pages[s] + 4096 - 1) != 67) printf("not the same\n\n\n");
-        if (*(char *) (pages[s + 1] + 4096 - 1) != 67) printf("not the same\n\n\n");
-        if (*(char *) (pages[s + 2] + 4096 - 1) != 67) printf("not the same\n\n\n");
-        if (*(char *) (pages[s + 3] + 4096 - 1) != 67) printf("not the same\n\n\n");
-        if (*(char *) (pages[s + 4] + 4096 - 1) != 67) printf("not the same\n\n\n");
+        if (*(char *) (pages[s] + 4096 - 1) != 67) {
+            printf("not the same\n\n\n\n\n\n");
+        } else {
+            printf("same\n");
+        }
+        if (*(char *) (pages[s + 1] + 4096 - 1) != 67) printf("not the same\n\n\n\n\n");
+        if (*(char *) (pages[s + 2] + 4096 - 1) != 67) printf("not the same\n\n\n\n\n");
+        if (*(char *) (pages[s + 3] + 4096 - 1) != 67) printf("not the same\n\n\n\n\n");
+        if (*(char *) (pages[s + 4] + 4096 - 1) != 67) printf("not the same\n\n\n\n\n");
     }
 
-    printf("new_maxout_vm test finished\n");
+    printf("new_maxout_vm test finished\n\n\n");
     exit(0);
 }

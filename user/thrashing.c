@@ -6,80 +6,35 @@
 #include "kernel/stat.h"
 #include "user.h"
 
-#define NUM_PAGES 400
-
 int
 main(int argc, char *argv[]) {
-    int pid;
-    enum { N=50 };
-
-    for(int i = 0; i < N; i++){
-        pid = fork();
+    for(int avail = 0; avail < 15; avail++){
+        int pid = fork();
         if(pid < 0){
             printf("fork failed\n");
             exit(1);
-        }
-        if(pid == 0) {
-            for(int m = 0; m < 10000; m++);
-
-
-            uint64 pages[NUM_PAGES];
-
-            for (int k = 0; k < NUM_PAGES; k++) {
+        } else if(pid == 0){
+            // allocate all of memory.
+            while(1){
                 uint64 a = (uint64) sbrk(4096);
-
-                if (a == 0xffffffffffffffff) {
-                    printf("doesn't work\n");
-                    sbrk(-k * 4096);
-
-                    exit(1);
-                }
-                pages[k] = a;
+                if(a == 0xffffffffffffffffLL)
+                    break;
+                *(char*)(a + 4096 - 1) = 1;
             }
 
-                for (int s = 0; s < NUM_PAGES; s += 20) {
-                    // modify the memory to make sure it's really allocated.
-                    for (int l = 0; l < 10; l++) {
-                        for (int m = 1; m < 4096; m++) {
-                            *(char *) (pages[s] + 4096 - m) = 1;
-                            *(char *) (pages[s+1] + 4096 - m) = 1;
-                            *(char *) (pages[s+2] + 4096 - m) = 1;
-                            *(char *) (pages[s+3] + 4096 - m) = 1;
-                            *(char *) (pages[s+4] + 4096 - m) = 1;
-                            *(char *) (pages[s+5] + 4096 - m) = 1;
-                            *(char *) (pages[s+6] + 4096 - m) = 1;
-                            *(char *) (pages[s+7] + 4096 - m) = 1;
-                            *(char *) (pages[s+8] + 4096 - m) = 1;
-                            *(char *) (pages[s+9] + 4096 - m) = 1;
-                            *(char *) (pages[s+10] + 4096 - m) = 1;
-                            *(char *) (pages[s+11] + 4096 - m) = 1;
-                            *(char *) (pages[s+12] + 4096 - m) = 1;
-                            *(char *) (pages[s+13] + 4096 - m) = 1;
-                            *(char *) (pages[s+14] + 4096 - m) = 1;
-                            *(char *) (pages[s+15] + 4096 - m) = 1;
-                            *(char *) (pages[s+16] + 4096 - m) = 1;
-                            *(char *) (pages[s+17] + 4096 - m) = 1;
-                            *(char *) (pages[s+18] + 4096 - m) = 1;
-                            *(char *) (pages[s+19] + 4096 - m) = 1;
-                        }
-                    }
-                }
+            // free a few pages, in order to let exec() make some
+            // progress.
+            for(int i = 0; i < avail; i++)
+                sbrk(-4096);
 
+            close(1);
+            char *args[] = { "echo", "x", 0 };
+            exec("echo", args);
             exit(0);
-        }
-    }
-
-    int xstatus;
-    for(int i = 0; i < N; i++){
-        wait(&xstatus);
-        if(xstatus != 0) {
-            printf("fork in child failed\n");
-            //exit(1);
         } else {
-            printf("OK\n");
+            wait((int*)0);
         }
     }
 
-    printf("thrashing test finished\n");
     exit(0);
 }
